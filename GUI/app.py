@@ -113,7 +113,7 @@ class ExcelMergerApp(ctk.CTk):
         self.revenue_tax_entry.insert(0, "20.0")
 
         # Постоянные расходы
-        ctk.CTkLabel(fields_frame, text="Постоянные расходы:").grid(row=2, column=0, sticky="w", padx=10, pady=8)
+        ctk.CTkLabel(fields_frame, text="Общефирменные расходы:").grid(row=2, column=0, sticky="w", padx=10, pady=8)
         self.fixed_costs_entry = ctk.CTkEntry(fields_frame, placeholder_text="500000", width=120)
         self.fixed_costs_entry.grid(row=2, column=1, padx=10, pady=8, sticky="e")
         self.fixed_costs_entry.insert(0, "500000")
@@ -140,7 +140,7 @@ class ExcelMergerApp(ctk.CTk):
         self.status_label.pack(pady=10)
 
     def on_file_select(self, index: int, file_path: str) -> bool:
-        """Только логика модели — НИКАКИХ лейблов!"""
+        """Только логика модели"""
         success = self.model.add_file(file_path, index)
         self.update_merge_button()
         return success
@@ -235,7 +235,7 @@ class ExcelMergerApp(ctk.CTk):
 
         self.generate_report(employees, specialists, managers)
 
-        result_list = self.model.create_result(employees, specialists, managers)
-
-        for i, res in enumerate(result_list, 1):
-            print(f"{res['name']} {res['categories']} {res['sum']} {res['cost_price']} {res['margin']} {res['salary']} {res['salary_tax']} {res['sum_tax']} {res['reg_costs']} {res['other_costs_margin']} {res['res_costs']} {res['profit_month']} {res['profit_prc']}")
+        # result_list = self.model.create_result(employees, specialists, managers)
+        #
+        # for i, res in enumerate(result_list, 1):
+        #     print(f"{res['name']} {res['categories']} {res['sum']} {res['cost_price']} {res['margin']} {res['salary']} {res['salary_tax']} {res['sum_tax']} {res['reg_costs']} {res['other_costs_margin']} {res['res_costs']} {res['profit_month']} {res['profit_prc']}")

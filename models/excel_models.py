@@ -20,6 +20,10 @@ class ExcelModel:
         self.params_file = "models/params.json"
         self._load_params()
 
+        # Переменные для логики с руководителем
+        self.negative_revenue = 0
+        self.director_row = 0
+
     def add_file(self, file_path: str, index: int) -> bool:
         """Универсальное чтение Excel"""
         while len(self.dataframes) <= index:
@@ -239,6 +243,12 @@ class ExcelModel:
         """
         result_list = []
 
+        self.negative_revenue = 0  # Сумма отрицательной выручки менеджеров
+
+        for manager in managers:
+            if manager['total_price'] < 0:
+                self.negative_revenue += manager['total_price']
+
         for emp in employees:
             person = {
                 'name': emp['name'],
@@ -269,15 +279,9 @@ class ExcelModel:
                 person['cost_price'] = 0
                 person['categories'] = []
 
-            person['margin'] = person['sum'] - person['cost_price']
-            person['sum_tax'] = round(person['sum'] * self.revenue_tax_pct, 1)
-            person['res_costs'] = person['salary'] + person['salary_tax'] + person['sum_tax'] + person['reg_costs']
-            person['profit_month'] = round(person['margin'] - person['res_costs'], 2)
-            person['profit_prc'] = round(person['profit_month'] / person['sum'] * 100, 1) if person['sum'] != 0 else None
-
             result_list.append(person)
 
-            result_list.sort(key=lambda x: (len(x['categories']) == 0, x['name']))
+            result_list.sort(key=lambda x: (len(x['categories']) == 0, x['name'] == 'Рыжков Артём Сергеевич', x['name']))
 
         return result_list
 
@@ -289,6 +293,51 @@ class ExcelModel:
         ws = wb.active
         ws.title = "Финансовая модель ДИТ. Отчёт"
 
+        person_rows = []
+        row_num = 3
+
+        row_num = self.persons_in_report(ws, result_list, row_num, person_rows)
+        row_num = self.results_in_report(ws, row_num, person_rows)
+        self.summary_table_in_report(ws, row_num + 2)
+        self.director_in_report(ws, row_num + 2)
+
+        # Табличные границы
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        # Применяем границы ко всем ячейкам с данными
+        for row in ws.iter_rows(min_row=1, max_row=row_num - 1, min_col=1, max_col=11):
+            for cell in row:
+                cell.border = thin_border
+
+        # Ширина колонок
+        column_widths = {
+            'A': 40,  # Сотрудник, Категория - пошире
+            'B': 14,  # Выручка, %
+            'C': 14,  # Себестоимость, Сумма
+            'D': 14,  # Маржа, Итого
+            'E': 14,  # ФОТ
+            'F': 14,  # Налоги ФОТ
+            'G': 14,  # Налоги выручка
+            'H': 14,  # Постоянные расходы
+            'I': 14,  # Итого затраты
+            'J': 14,  # Рентабельность месяца
+            'K': 14   # % рентабельности
+        }
+
+        # Применяем ширину колонок
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
+
+        wb.save(output)
+        output.seek(0)
+        return output.getvalue()
+
+    def persons_in_report(self, ws, result_list, row_num, person_rows):
         # Заголовки
         headers = [
             "Сотрудник", "Выручка (реализации)", "Себестоимость", "Маржа",
@@ -300,32 +349,37 @@ class ExcelModel:
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True, size=12)
-            cell.alignment = Alignment(horizontal="center")
+            cell.alignment = Alignment(horizontal="center", wrap_text=True)
             cell.fill = PatternFill(start_color="D9D9D9", fill_type="solid")
 
         ws.cell(row=2, column=6, value=self.fot_tax_pct).number_format = '0.0%'
         ws.cell(row=2, column=7, value=self.revenue_tax_pct).number_format = '0.0%'
         ws.cell(row=2, column=8, value=self.fixed_costs)
 
-        row_num = 3
-
         for person in result_list:
             # Строка ФИО
             fio_row = row_num
+
+            if len(person['categories']) > 0:
+                person_rows.append(row_num)
+
+            # Сохраняем строку с руководителем
+            if person['name'] == 'Рыжков Артём Сергеевич':
+                self.director_row = row_num
 
             # Данные строки
             data_row = [
                 person['name'],
                 person.get('sum', 0),
                 person.get('cost_price', 0),
-                '',
+                f"=B{row_num}-C{row_num}",
                 person.get('salary', 0),
-                '',
-                '',
-                '',
-                '',
-                '',
-                ''
+                f"=E{row_num}*$F$2",
+                f"=B{row_num}*$G$2",
+                "=$H$2",
+                f"=SUM(E{row_num}:H{row_num})",
+                f"=D{row_num}-I{row_num}",
+                f"=IF(B{row_num}=0,0,J{row_num}/B{row_num}*100)"
             ]
 
             # Заполняем строку ФИО
@@ -335,27 +389,11 @@ class ExcelModel:
                 # Бледно-жёлтый для всей строки ФИО
                 if col == 1:  # ФИО - жирный
                     cell.font = Font(bold=True, size=11)
-                    cell.alignment = Alignment(horizontal="center")
                 else:  # Числа
                     cell.number_format = '#,##0.0'
 
                 # Бледно-жёлтый фон для всех ячеек строки
                 cell.fill = PatternFill(start_color="FFF2CC", fill_type="solid")
-
-                # Маржа = B - C
-                ws.cell(row=row_num, column=4).value = f"=B{row_num}-C{row_num}"
-                # Налоги ФОТ = E * $F$2
-                ws.cell(row=row_num, column=6).value = f"=E{row_num}*$F$2"
-                # Налоги выручка = B * $G$2
-                ws.cell(row=row_num, column=7).value = f"=B{row_num}*$G$2"
-                # Постоянные расходы = $H$2
-                ws.cell(row=row_num, column=8).value = "=$H$2"
-                # Итого затраты = E+F+G+H
-                ws.cell(row=row_num, column=9).value = f"=SUM(E{row_num}:H{row_num})"
-                # Рентабельность = D - I
-                ws.cell(row=row_num, column=10).value = f"=D{row_num}-I{row_num}"
-                # % рент. = безопасная формула
-                ws.cell(row=row_num, column=11).value = f"=IF(B{row_num}=0,0,J{row_num}/B{row_num}*100)"
 
             # Categories под ФИО
             if person.get('categories') and len(person['categories']) > 0:
@@ -378,24 +416,81 @@ class ExcelModel:
             else:
                 row_num += 1
 
-        # Табличные границы
+        return row_num
+
+    def results_in_report(self, ws, row_num, person_rows):
+        # Надпись ИТОГО
+        result_row = row_num
+        result_cell = ws.cell(row=result_row, column=1, value="ИТОГО")
+        result_cell.font = Font(bold=True, size=12)
+        result_cell.alignment = Alignment(horizontal="center")
+        red_fill = PatternFill(start_color="FF7514", fill_type="solid")
+
+        # Формулы + форматирование
+        columns_data = [
+            (2, f"=SUM({','.join(f'B{row}' for row in person_rows)})", '#,##0.0""'),  # Выручка
+            (3, f"=SUM({','.join(f'C{row}' for row in person_rows)})", '#,##0.0""'),  # Себестоимость
+            (4, f"=SUM({','.join(f'D{row}' for row in person_rows)})", '#,##0.0""'),  # Маржа
+            (5, f"=SUM(E3:E{result_row - 1})", '#,##0.0""'),  # ФОТ
+            (6, f"=SUM(F3:F{result_row - 1})", '#,##0.0""'),  # Налоги ФОТ
+            (7, f"=SUM(G3:G{result_row - 1})", '#,##0.0""'),  # Налоги выручка
+            (8, f"=SUM(H3:H{result_row - 1})", '#,##0.0""'),  # Постоянные расходы
+            (9, f"=SUM(I3:I{result_row - 1})", '#,##0.0""'),  # Итого затраты
+            (10, f"=SUM(J3:J{result_row - 1})", '#,##0.0""'),  # Рентабельность
+            (11, f"=J{result_row}/B{result_row}", '0.0%')  # % Рентабильности
+        ]
+
+        for col, formula, num_format in columns_data:
+            cell = ws.cell(row=result_row, column=col, value=formula)
+            cell.number_format = num_format
+            cell.fill = red_fill  # Красный фон
+            cell.alignment = Alignment(horizontal="right")
+
+        result_cell.fill = red_fill
+
+        return row_num
+
+    def summary_table_in_report(self, ws, row_num):
+        # Стили заливки
+        light_red_fill = PatternFill(start_color='F8E8E8', end_color='F8E8E8', fill_type='solid')
+        light_green_fill = PatternFill(start_color='E8F5E8', end_color='E8F5E8', fill_type='solid')
         thin_border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
         )
 
-        # Применяем границы ко всем ячейкам с данными
-        for row in ws.iter_rows(min_row=1, max_row=row_num - 1, min_col=1, max_col=11):
-            for cell in row:
+        # Заголовки (строка)
+        headers = ['Категория', '%', 'Сумма', 'Итого']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row_num, column=col, value=header)
+            cell.font = Font(bold=True, size=12)
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = thin_border
+
+        row_num += 1
+
+        data = [
+            {'category': 'Проектники', 'pct': 0.8, 'base': 0, 'result': f'=C{row_num}*B{row_num}'},
+            {'category': 'Внедрение', 'pct': 0.7, 'base': 0, 'result': f'=C{row_num + 1}*B{row_num + 1}'},
+            {'category': 'Субподряд', 'pct': 1.0, 'base': self.negative_revenue * -1, 'result': f'=C{row_num + 2}*B{row_num + 2}'},
+            {'category': 'Реал. из иных отделов', 'pct': 0.7, 'base': 0, 'result': f'=C{row_num + 3}*B{row_num + 3}'},
+            {'category': 'Взаиморасчёты', 'pct': 1.0, 'base': 0, 'result': f'=C{row_num + 4}*B{row_num + 4}'},
+        ]
+
+        for i, row_data in enumerate(data):
+            row = row_num + i
+            ws.cell(row=row, column=1, value=row_data['category'])
+            ws.cell(row=row, column=2, value=row_data['pct']).number_format = '0%'
+            ws.cell(row=row, column=3, value=row_data['base']).number_format = '#,##0.0""'
+            ws.cell(row=row, column=4, value=row_data['result']).number_format = '#,##0.0""'
+
+            # Применяем стили
+            for col in range(1, 5):
+                cell = ws.cell(row=row, column=col)
+                cell.font = Font(bold=True, size=12) if col == 1 else Font(bold=False, size=12)
+                cell.fill = light_red_fill if i < 3 else light_green_fill
                 cell.border = thin_border
 
-        # Автоподгонка ширины колонок
-        for column_cells in ws.columns:
-            length = max(len(str(cell.value or "")) for cell in column_cells)
-            ws.column_dimensions[column_cells[0].column_letter].width = min(length + 2, 25)
-
-        wb.save(output)
-        output.seek(0)
-        return output.getvalue()
+    def director_in_report(self, ws, row_num):
+        ws.cell(row=self.director_row, column=3, value=f'=D{row_num + 1}+D{row_num + 2}+D{row_num + 3}')
+        ws.cell(row=self.director_row, column=2, value=f'=D{row_num + 4}+D{row_num + 5}')
