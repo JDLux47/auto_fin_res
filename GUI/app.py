@@ -201,12 +201,9 @@ class ExcelMergerApp(ctk.CTk):
             return
 
         try:
-            fot_tax = float(self.fot_tax_entry.get())
-            revenue_tax = float(self.revenue_tax_entry.get())
-            fixed_costs = float(self.fixed_costs_entry.get())
-
-            # Сохраняем в модель (и в params.json автоматически)
-            self.model.set_parameters(fot_tax, revenue_tax, fixed_costs)
+            float(self.fot_tax_entry.get())
+            float(self.revenue_tax_entry.get())
+            float(self.fixed_costs_entry.get())
 
         except ValueError:
             messagebox.showerror("Ошибка", "Введите корректные числа в поля параметров!")
@@ -217,25 +214,4 @@ class ExcelMergerApp(ctk.CTk):
         specialists = self.model.get_specialists()
         managers = self.model.get_managers()
 
-        # print("==========Сотрудники==========")
-        # for i, emp in enumerate(employees, 1):
-        #     print(f"{i:2d}. {emp['name']:<25} {emp['salary']}")
-        #
-        # print("==========Спецы==========")
-        # for i, emp in enumerate(specialists, 1):
-        #     print(f"{i:2d}. {emp['name']:<25} {emp['sum']}")
-
-        # print("==========Менеджеры==========")
-        # for i, manager in enumerate(managers, 1):
-        #     print(f"{i:2d}. {manager['name']} | " f"{manager['total_price']} | " f"{manager['total_cost']}")
-        #
-        #     for cat in manager['categories']:
-        #         print(f"    └─ {cat['name']} | {cat['price']} | {cat['cost']}")
-        #     print()
-
         self.generate_report(employees, specialists, managers)
-
-        # result_list = self.model.create_result(employees, specialists, managers)
-        #
-        # for i, res in enumerate(result_list, 1):
-        #     print(f"{res['name']} {res['categories']} {res['sum']} {res['cost_price']} {res['margin']} {res['salary']} {res['salary_tax']} {res['sum_tax']} {res['reg_costs']} {res['other_costs_margin']} {res['res_costs']} {res['profit_month']} {res['profit_prc']}")

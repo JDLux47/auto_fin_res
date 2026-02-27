@@ -1,5 +1,6 @@
 import io
 import json
+import sys
 import pandas as pd
 import os
 from openpyxl import Workbook
@@ -13,12 +14,9 @@ class ExcelModel:
         self.dataframes = []
         self.is_valid = []
 
-        self.fot_tax_pct = 0.0
-        self.revenue_tax_pct = 0.0
-        self.fixed_costs = 0.0
-
-        self.params_file = "models/params.json"
-        self._load_params()
+        self.fot_tax_pct = 0.125
+        self.revenue_tax_pct = 0.045
+        self.fixed_costs = 40000.0
 
         # Переменные для логики с руководителем
         self.negative_revenue = 0
@@ -206,36 +204,6 @@ class ExcelModel:
             return float(salary_raw)
         except:
             return 0.0
-
-    def _load_params(self):
-        """Загружает ваш params.json"""
-        if os.path.exists(self.params_file):
-            try:
-                with open(self.params_file, 'r', encoding='utf-8') as f:
-                    params = json.load(f)
-                    self.fot_tax_pct = params.get("fot_tax") / 100
-                    self.revenue_tax_pct = params.get("revenue_tax") / 100
-                    self.fixed_costs = params.get("fixed_costs")
-            except Exception as error:
-                print(error)
-
-    def set_parameters(self, fot_tax: float, revenue_tax: float, fixed_costs: float):
-        """Сохраняет параметры в JSON (ваш формат)"""
-        self.fot_tax_pct = fot_tax / 100
-        self.revenue_tax_pct = revenue_tax / 100
-        self.fixed_costs = fixed_costs
-
-        params = {
-            "fot_tax": fot_tax,
-            "revenue_tax": revenue_tax,
-            "fixed_costs": fixed_costs
-        }
-
-        try:
-            with open(self.params_file, 'w', encoding='utf-8') as f:
-                json.dump(params, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Ошибка сохранения params.json: {e}")
 
     def create_result(self, employees: list, specialists: list, managers: list) -> list:
         """
