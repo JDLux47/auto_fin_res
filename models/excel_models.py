@@ -334,6 +334,7 @@ class ExcelModel:
             # Сохраняем строку с руководителем
             if person['name'] == 'Рыжков Артём Сергеевич':
                 self.director_row = row_num
+                person_rows.append(self.director_row)
 
             # Данные строки
             data_row = [
@@ -441,8 +442,9 @@ class ExcelModel:
             {'category': 'Проектники', 'pct': 0.8, 'base': 0, 'result': f'=C{row_num}*B{row_num}'},
             {'category': 'Внедрение', 'pct': 0.7, 'base': 0, 'result': f'=C{row_num + 1}*B{row_num + 1}'},
             {'category': 'Субподряд', 'pct': 1.0, 'base': self.negative_revenue * -1, 'result': f'=C{row_num + 2}*B{row_num + 2}'},
-            {'category': 'Реал. из иных отделов', 'pct': 0.7, 'base': 0, 'result': f'=C{row_num + 3}*B{row_num + 3}'},
-            {'category': 'Взаиморасчёты', 'pct': 1.0, 'base': 0, 'result': f'=C{row_num + 4}*B{row_num + 4}'},
+            {'category': 'Отрицательный взаиморасчёт', 'pct': 1.0, 'base': 0, 'result': f'=C{row_num + 3}*B{row_num + 3}'},
+            {'category': 'Реализации из иных отделов', 'pct': 0.7, 'base': 0, 'result': f'=C{row_num + 4}*B{row_num + 4}'},
+            {'category': 'Взаиморасчёты', 'pct': 1.0, 'base': 0, 'result': f'=C{row_num + 5}*B{row_num + 5}'},
         ]
 
         for i, row_data in enumerate(data):
@@ -456,9 +458,9 @@ class ExcelModel:
             for col in range(1, 5):
                 cell = ws.cell(row=row, column=col)
                 cell.font = Font(bold=True, size=12) if col == 1 else Font(bold=False, size=12)
-                cell.fill = light_red_fill if i < 3 else light_green_fill
+                cell.fill = light_red_fill if i < 4 else light_green_fill
                 cell.border = thin_border
 
     def director_in_report(self, ws, row_num):
-        ws.cell(row=self.director_row, column=3, value=f'=D{row_num + 1}+D{row_num + 2}+D{row_num + 3}')
-        ws.cell(row=self.director_row, column=2, value=f'=D{row_num + 4}+D{row_num + 5}')
+        ws.cell(row=self.director_row, column=3, value=f'=D{row_num + 1}+D{row_num + 2}+D{row_num + 3}+D{row_num + 4}')
+        ws.cell(row=self.director_row, column=2, value=f'=D{row_num + 5}+D{row_num + 6}')
