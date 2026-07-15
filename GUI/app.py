@@ -59,27 +59,6 @@ class ExcelMergerApp(ctk.CTk):
 
         self.create_widgets()
         self.update_merge_button()
-        self._load_params_to_fields()
-
-    def _load_params_to_fields(self):
-        """Загружает значения из params.json в поля"""
-        try:
-            fot_tax = round(self.model.fot_tax_pct * 100, 1)
-            revenue_tax = round(self.model.revenue_tax_pct * 100, 1)
-            fixed_costs = int(self.model.fixed_costs)
-
-            self.fot_tax_entry.delete(0, ctk.END)
-            self.fot_tax_entry.insert(0, str(fot_tax))
-
-            self.revenue_tax_entry.delete(0, ctk.END)
-            self.revenue_tax_entry.insert(0, str(revenue_tax))
-
-            self.fixed_costs_entry.delete(0, ctk.END)
-            self.fixed_costs_entry.insert(0, str(fixed_costs))
-
-            print(f"Поля заполнены из params.json: {fot_tax}%, {revenue_tax}%, {fixed_costs:,}")
-        except Exception as e:
-            print(f"Ошибка загрузки параметров: {e}")
 
     def create_widgets(self):
         title = ctk.CTkLabel(self, text="Загрузите Excel файлы (.xlsx, .xls, .xlsm)",
@@ -102,21 +81,21 @@ class ExcelMergerApp(ctk.CTk):
 
         # Налог на ФОТ %
         ctk.CTkLabel(fields_frame, text="Налог на ФОТ %:").grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        self.fot_tax_entry = ctk.CTkEntry(fields_frame, placeholder_text="30.0", width=120)
+        self.fot_tax_entry = ctk.CTkEntry(fields_frame, placeholder_text="26.0", width=120)
         self.fot_tax_entry.grid(row=0, column=1, padx=10, pady=8, sticky="e")
-        self.fot_tax_entry.insert(0, "30.0")  # Значение по умолчанию
+        self.fot_tax_entry.insert(0, 26.0)  # Значение по умолчанию
 
         # Налог на выручку %
         ctk.CTkLabel(fields_frame, text="Налог на выручку %:").grid(row=1, column=0, sticky="w", padx=10, pady=8)
-        self.revenue_tax_entry = ctk.CTkEntry(fields_frame, placeholder_text="20.0", width=120)
+        self.revenue_tax_entry = ctk.CTkEntry(fields_frame, placeholder_text="4.5", width=120)
         self.revenue_tax_entry.grid(row=1, column=1, padx=10, pady=8, sticky="e")
-        self.revenue_tax_entry.insert(0, "20.0")
+        self.revenue_tax_entry.insert(0, 4.5)
 
         # Постоянные расходы
         ctk.CTkLabel(fields_frame, text="Общефирменные расходы:").grid(row=2, column=0, sticky="w", padx=10, pady=8)
-        self.fixed_costs_entry = ctk.CTkEntry(fields_frame, placeholder_text="500000", width=120)
+        self.fixed_costs_entry = ctk.CTkEntry(fields_frame, placeholder_text="48000", width=120)
         self.fixed_costs_entry.grid(row=2, column=1, padx=10, pady=8, sticky="e")
-        self.fixed_costs_entry.insert(0, "500000")
+        self.fixed_costs_entry.insert(0, 48000)
 
         self.merge_btn = ctk.CTkButton(
             self,
@@ -184,6 +163,9 @@ class ExcelMergerApp(ctk.CTk):
                 messagebox.showerror("Ошибка", f"Ошибка сохранения:\n{str(e)}")
 
     def generate_report(self, employees, specialists, managers):
+
+        self.model.set_params(float(self.fot_tax_entry.get()), float(self.revenue_tax_entry.get()), float(self.fixed_costs_entry.get()))
+
         result_list = self.model.create_result(employees, specialists, managers)  # Ваш список person
 
         excel_data = self.model.create_report(result_list)

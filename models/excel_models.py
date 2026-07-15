@@ -14,13 +14,18 @@ class ExcelModel:
         self.dataframes = []
         self.is_valid = []
 
-        self.fot_tax_pct = 0.125
+        self.fot_tax_pct = 0.26
         self.revenue_tax_pct = 0.045
-        self.fixed_costs = 40000.0
+        self.fixed_costs = 48000.0
 
         # Переменные для логики с руководителем
         self.negative_revenue = 0
         self.director_row = 0
+
+    def set_params(self, fot_tax_pct, revenue_tax_pct, fixed_costs):
+        self.fot_tax_pct = fot_tax_pct / 100
+        self.revenue_tax_pct = revenue_tax_pct / 100
+        self.fixed_costs = fixed_costs
 
     def add_file(self, file_path: str, index: int) -> bool:
         """Универсальное чтение Excel"""
