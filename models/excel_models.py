@@ -21,6 +21,7 @@ class ExcelModel:
         # Переменные для логики с руководителем
         self.negative_revenue = 0
         self.director_row = 0
+        self.result_row = 0
 
     def set_params(self, fot_tax_pct, revenue_tax_pct, fixed_costs):
         self.fot_tax_pct = fot_tax_pct / 100
@@ -306,6 +307,8 @@ class ExcelModel:
         for col_letter, width in column_widths.items():
             ws.column_dimensions[col_letter].width = width
 
+        self.create_summary_sheet(wb, result_list)
+
         wb.save(output)
         output.seek(0)
         return output.getvalue()
@@ -394,8 +397,8 @@ class ExcelModel:
 
     def results_in_report(self, ws, row_num, person_rows):
         # Надпись ИТОГО
-        result_row = row_num
-        result_cell = ws.cell(row=result_row, column=1, value="ИТОГО")
+        self.result_row = row_num
+        result_cell = ws.cell(row=self.result_row, column=1, value="ИТОГО")
         result_cell.font = Font(bold=True, size=12)
         result_cell.alignment = Alignment(horizontal="center")
         red_fill = PatternFill(start_color="FF7514", fill_type="solid")
@@ -405,17 +408,17 @@ class ExcelModel:
             (2, f"=SUM({','.join(f'B{row}' for row in person_rows)})", '#,##0.0""'),  # Выручка
             (3, f"=SUM({','.join(f'C{row}' for row in person_rows)})", '#,##0.0""'),  # Себестоимость
             (4, f"=SUM({','.join(f'D{row}' for row in person_rows)})", '#,##0.0""'),  # Маржа
-            (5, f"=SUM(E3:E{result_row - 1})", '#,##0.0""'),  # ФОТ
-            (6, f"=SUM(F3:F{result_row - 1})", '#,##0.0""'),  # Налоги ФОТ
-            (7, f"=SUM(G3:G{result_row - 1})", '#,##0.0""'),  # Налоги выручка
-            (8, f"=SUM(H3:H{result_row - 1})", '#,##0.0""'),  # Постоянные расходы
-            (9, f"=SUM(I3:I{result_row - 1})", '#,##0.0""'),  # Итого затраты
-            (10, f"=SUM(J3:J{result_row - 1})", '#,##0.0""'),  # Рентабельность
-            (11, f"=J{result_row}/B{result_row}", '0.0%')  # % Рентабильности
+            (5, f"=SUM(E3:E{self.result_row - 1})", '#,##0.0""'),  # ФОТ
+            (6, f"=SUM(F3:F{self.result_row - 1})", '#,##0.0""'),  # Налоги ФОТ
+            (7, f"=SUM(G3:G{self.result_row - 1})", '#,##0.0""'),  # Налоги выручка
+            (8, f"=SUM(H3:H{self.result_row - 1})", '#,##0.0""'),  # Постоянные расходы
+            (9, f"=SUM(I3:I{self.result_row - 1})", '#,##0.0""'),  # Итого затраты
+            (10, f"=SUM(J3:J{self.result_row - 1})", '#,##0.0""'),  # Рентабельность
+            (11, f"=J{self.result_row}/B{self.result_row}", '0.0%')  # % Рентабильности
         ]
 
         for col, formula, num_format in columns_data:
-            cell = ws.cell(row=result_row, column=col, value=formula)
+            cell = ws.cell(row=self.result_row, column=col, value=formula)
             cell.number_format = num_format
             cell.fill = red_fill  # Красный фон
             cell.alignment = Alignment(horizontal="right")
@@ -469,3 +472,213 @@ class ExcelModel:
     def director_in_report(self, ws, row_num):
         ws.cell(row=self.director_row, column=3, value=f'=D{row_num + 1}+D{row_num + 2}+D{row_num + 3}+D{row_num + 4}')
         ws.cell(row=self.director_row, column=2, value=f'=D{row_num + 5}+D{row_num + 6}')
+
+
+    def get_categories_summary_list(self, result_list):
+        """
+        Формирует список номенклатуры, их суммарную себестоимость и выручку
+        """
+        categories_summary = {}
+
+        for item in result_list:
+            for cat in item.get('categories', []):
+                name = cat.get('name')
+                cost = cat.get('cost', 0) or 0
+                price = cat.get('price', 0) or 0
+
+                if name not in categories_summary:
+                    categories_summary[name] = {
+                        'name': name,
+                        'total_cost': 0,
+                        'total_price': 0
+                    }
+
+                categories_summary[name]['total_cost'] += cost
+                categories_summary[name]['total_price'] += price
+
+        return list(categories_summary.values())
+
+
+    def create_summary_sheet(self, wb, result_list):
+        """
+        Формирует второй лист: сводка по организации
+        Все значения считаются формулами по первому листу "Финансовая модель ДИТ. Отчёт"
+        """
+        ws = wb.create_sheet(title="Сводка по организации")
+        # Ссылки на первый лист и ключевые строки
+        main_ws_name = "Финансовая модель ДИТ. Отчёт"
+
+        # Заголовок листа
+        ws.merge_cells('A1:B1')
+        cell_title = ws.cell(row=1, column=1, value="Краснодар Центральный офис")
+        cell_title.font = Font(bold=True, size=12)
+        cell_title.alignment = Alignment(horizontal="left", vertical="center")
+
+        # Заголовки колонок
+        headers = ["Наименование", "Сумма"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            cell.font = Font(bold=True, size=12)
+            cell.alignment = Alignment(horizontal="center", wrap_text=True)
+            cell.fill = PatternFill(start_color="D9D9D9", fill_type="solid")
+
+        # Ширина колонок
+        ws.column_dimensions['A'].width = 40
+        ws.column_dimensions['B'].width = 20
+
+        # Стили
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        # ===== Строки сводки =====
+        current_row = 4
+
+        # 1) Количество сотрудников
+        cell = ws.cell(row=current_row, column=1, value=f"Количество сотрудников")
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        cell.font = Font(bold=True)
+
+        cell = ws.cell(row=current_row, column=2, value=len(result_list))
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        current_row += 1
+
+        # 2) Чистая выручка от реализации товаров и услуг (общая)
+        cell = ws.cell(row=current_row, column=1, value=f"1. Чистая выручка от реализации товаров и услуг")
+        cell.fill = PatternFill(fill_type="solid", fgColor="00a550")
+        cell.font = Font(bold=True)
+
+        price_cell = ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!B{self.result_row}")
+        price_cell.fill = PatternFill(fill_type="solid", fgColor="00a550")
+        current_row += 1
+
+        categories_summary = self.get_categories_summary_list(result_list)
+
+        # 2.1) Чистая выручка по каждой категории
+        for category in categories_summary:
+            ws.cell(row=current_row, column=1, value=category['name'])
+            ws.cell(row=current_row, column=2, value=category['total_price'])
+            current_row += 1
+
+        # 3) Себестоимость товаров и услуг
+        cell = ws.cell(row=current_row, column=1, value=f"2. Себестоимость товаров и услуг")
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        cell.font = Font(bold=True)
+
+        cost_cell = ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!C{self.result_row}")
+        cost_cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        current_row += 1
+
+        # 3.1) Себестоимость по категориям
+        for category in categories_summary:
+            ws.cell(row=current_row, column=1, value=category['name'])
+            ws.cell(row=current_row, column=2, value=category['total_cost'])
+            current_row += 1
+
+        # 4) Маржа
+        cell = ws.cell(row=current_row, column=1, value=f"Маржа")
+        cell.fill = PatternFill(fill_type="solid", fgColor="42aaff")
+        cell.font = Font(bold=True)
+
+        cell_margin = ws.cell(row=current_row, column=2, value=f"={price_cell.coordinate}-{cost_cell.coordinate}")
+        cell_margin.fill = PatternFill(fill_type="solid", fgColor="42aaff")
+        current_row += 1
+
+        # 4.1) % Маржинальности = Маржа / Выручка
+        cell = ws.cell(row=current_row, column=1, value=f"% Маржинальности")
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        cell.font = Font(bold=True)
+
+        cell = ws.cell(row=current_row, column=2, value=f"=B{current_row - 1}/{price_cell.coordinate}")
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        cell.number_format = '0.00%'
+        current_row += 1
+
+        # 5) Затраты отдела (общие)
+        cell = ws.cell(row=current_row, column=1, value=f"Затраты отдела")
+        cell.fill = PatternFill(fill_type="solid", fgColor="dc143c")
+        cell.font = Font(bold=True)
+
+        cell_expenses = ws.cell(row=current_row, column=2, value=f"=SUM(B{current_row + 1}:B{current_row + 5})")
+        cell_expenses.fill = PatternFill(fill_type="solid", fgColor="dc143c")
+        current_row += 1
+
+        # 5.1) Налоги от выручки
+        cell = ws.cell(row=current_row, column=1, value=f"Налоги от выручки")
+        cell.font = Font(bold=True)
+
+        ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!G{self.result_row}")
+        current_row += 1
+
+        # 5.2) ФОТ
+        cell = ws.cell(row=current_row, column=1, value=f"ФОТ")
+        cell.font = Font(bold=True)
+
+        ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!E{self.result_row}")
+        current_row += 1
+
+        # 5.3) Налоги на ФОТ
+        cell = ws.cell(row=current_row, column=1, value=f"Налоги на ФОТ")
+        cell.font = Font(bold=True)
+
+        cell_fot = ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!F{self.result_row}")
+        current_row += 1
+
+        # 5.4) Прочие постоянные расходы
+        cell = ws.cell(row=current_row, column=1, value=f"Прочие постоянные расходы")
+        cell.font = Font(bold=True)
+        current_row += 1
+
+        # 5.5) Прочие затраты от маржи
+        cell = ws.cell(row=current_row, column=1, value=f"Прочие затраты от маржи")
+        cell.font = Font(bold=True)
+        current_row += 1
+
+        # # 6) Чистая прибыль (убыток)
+        cell = ws.cell(row=current_row, column=1, value=f"Чистая прибыль (убыток)")
+        cell.fill = PatternFill(fill_type="solid", fgColor="42aaff")
+        cell.font = Font(bold=True)
+
+        cell = ws.cell(row=current_row, column=2, value=f"={cell_margin.coordinate} - {cell_expenses.coordinate}")
+        cell.fill = PatternFill(fill_type="solid", fgColor="42aaff")
+        current_row += 1
+
+        # # 6.1) % Прибыльности = Чистая прибыль / Выручка
+        cell = ws.cell(row=current_row, column=1, value=f"% Прибыльности")
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        cell.font = Font(bold=True)
+
+        cell = ws.cell(row=current_row, column=2, value=f"=B{current_row - 1}/{price_cell.coordinate}")
+        cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
+        cell.number_format = '0.00%'
+        current_row += 1
+
+        # 7) ФОТ/реализация
+        cell = ws.cell(row=current_row, column=1, value=f"ФОТ/реализация")
+        cell.font = Font(bold=True)
+
+        cell = ws.cell(row=current_row, column=2, value=f"={cell_fot.coordinate}/{price_cell.coordinate}")
+        cell.number_format = '0.00%'
+        current_row += 1
+
+        # 8) ФОТ/маржа
+        cell = ws.cell(row=current_row, column=1, value=f"ФОТ/маржа")
+        cell.font = Font(bold=True)
+
+        cell = ws.cell(row=current_row, column=2, value=f"={cell_fot.coordinate}/{cell_margin.coordinate}")
+        cell.number_format = '0.00%'
+        current_row += 1
+
+        # Границы для заголовка + шапки
+        for row in ws.iter_rows(
+                min_row=1,
+                max_row=current_row - 1,
+                min_col=1,
+                max_col=2
+        ):
+            for cell in row:
+                if cell.row >= 3:  # данные + заголовки
+                    cell.border = thin_border
