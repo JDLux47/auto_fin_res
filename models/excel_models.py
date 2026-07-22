@@ -18,10 +18,11 @@ class ExcelModel:
         self.revenue_tax_pct = 0.045
         self.fixed_costs = 48000.0
 
-        # Переменные для логики с руководителем
+        # Переменные для логики
         self.negative_revenue = 0
         self.director_row = 0
         self.result_row = 0
+        self.realization_from_other_departments_row = 0
 
     def set_params(self, fot_tax_pct, revenue_tax_pct, fixed_costs):
         self.fot_tax_pct = fot_tax_pct / 100
@@ -455,6 +456,8 @@ class ExcelModel:
             {'category': 'Взаиморасчёты', 'pct': 1.0, 'base': 0, 'result': f'=C{row_num + 5}*B{row_num + 5}'},
         ]
 
+        self.realization_from_other_departments_row = row_num + 4
+
         for i, row_data in enumerate(data):
             row = row_num + i
             ws.cell(row=row, column=1, value=row_data['category'])
@@ -505,8 +508,6 @@ class ExcelModel:
         Все значения считаются формулами по первому листу "Финансовая модель ДИТ. Отчёт"
         """
         ws = wb.create_sheet(title="Сводка по организации")
-        # Ссылки на первый лист и ключевые строки
-        main_ws_name = "Финансовая модель ДИТ. Отчёт"
 
         # Заголовок листа
         ws.merge_cells('A1:B1')
@@ -547,7 +548,7 @@ class ExcelModel:
         current_row += 1
 
         # 2) Чистая выручка от реализации товаров и услуг (общая)
-        cell = ws.cell(row=current_row, column=1, value=f"1. Чистая выручка от реализации товаров и услуг")
+        cell = ws.cell(row=current_row, column=1, value=f"Чистая выручка от реализации товаров и услуг")
         cell.fill = PatternFill(fill_type="solid", fgColor="00a550")
         cell.font = Font(bold=True)
 
@@ -563,8 +564,18 @@ class ExcelModel:
             ws.cell(row=current_row, column=2, value=category['total_price'])
             current_row += 1
 
+        # 2.1.1) Реализация из иных отделов
+        ws.cell(row=current_row, column=1, value=f"Реализация из иных отделов")
+        ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!D{self.realization_from_other_departments_row}")
+        current_row += 1
+
+        # 2.1.2) Прочее
+        ws.cell(row=current_row, column=1, value=f"Прочее")
+        ws.cell(row=current_row, column=2, value=f"={price_cell.coordinate}-SUM(B{price_cell.row + 1}:B{current_row - 1})")
+        current_row += 1
+
         # 3) Себестоимость товаров и услуг
-        cell = ws.cell(row=current_row, column=1, value=f"2. Себестоимость товаров и услуг")
+        cell = ws.cell(row=current_row, column=1, value=f"Себестоимость товаров и услуг")
         cell.fill = PatternFill(fill_type="solid", fgColor="ffd700")
         cell.font = Font(bold=True)
 
@@ -617,19 +628,21 @@ class ExcelModel:
         cell = ws.cell(row=current_row, column=1, value=f"ФОТ")
         cell.font = Font(bold=True)
 
-        ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!E{self.result_row}")
+        cell_fot = ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!E{self.result_row}")
         current_row += 1
 
         # 5.3) Налоги на ФОТ
         cell = ws.cell(row=current_row, column=1, value=f"Налоги на ФОТ")
         cell.font = Font(bold=True)
 
-        cell_fot = ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!F{self.result_row}")
+        ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!F{self.result_row}")
         current_row += 1
 
         # 5.4) Прочие постоянные расходы
         cell = ws.cell(row=current_row, column=1, value=f"Прочие постоянные расходы")
         cell.font = Font(bold=True)
+
+        ws.cell(row=current_row, column=2, value=f"='Финансовая модель ДИТ. Отчёт'!H{self.result_row}")
         current_row += 1
 
         # 5.5) Прочие затраты от маржи
